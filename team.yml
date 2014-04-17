@@ -1,0 +1,26 @@
+message:
+  permission: '&cNie masz uprawnien'
+  nopage: '&cNie znaleziono strony'
+  emptylist: '&cList jest pusta'
+
+team:
+  pvpinteam: false
+  length:
+    min: 3
+    max: 5
+  create: 'item' #Dozwolone item , money lub none#
+
+price:
+  item-create:
+    - 'sand'
+    - '24 stone'
+  money-create: '200'
+
+help:
+  - '&c<number>. &6<command>&f - Lista Komend'
+  - '&c<number>. &6<command> create <nazwa>&f - Aby utworzyc team'
+  - '&c<number>. &6<command> usun&f - Aby usunac team'
+  - '&c<number>. &6<command> lista&f - lista teamow'
+  - '&c<number>. &6<command> invite <nazwa gracza>&f - zaproszenie gracza'
+  - '&c<number>. &6<command> accept <nazwa teamu>&f - akceptacja zaproszenia'
+  - '&c<number>. &6<command> info <nazwa teamu>&f - informacje '

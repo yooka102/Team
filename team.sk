@@ -1,0 +1,276 @@
+#------------------------------------------------------#
+# Skrypt: Team                                         #
+#------------------------------------------------------#
+# {team.%nazwa%.invited::*} - Lista zaproszonych osob #
+# {teamplayer::%UUID of player%} - Nazwa teamu #
+# {teams::*} - lista team-ow #
+# {team.%nazwa%::*} - Lista osow w teami #
+# {teamplayer::%{uuid.%name of player%}%} - Nazwa team-u gracza #
+
+#------------------------------------------------------#
+on load:
+	set {team.message::permission} to coloured value "message.permission" get of "plugins/Skript/scripts/%script%.yml"
+	set {team.message::nopage} to coloured value "message.nopage" get of "plugins/Skript/scripts/%script%.yml"
+	set {team.message::emptylist} to coloured value "message.emptylist" get of "plugins/Skript/scripts/%script%.yml"
+
+
+	set {team.help::*} to coloured value list "help" get of "plugins/Skript/scripts/%script%.yml"
+
+
+	set {team.conf::lengthmin} to value "team.length.min" get of "plugins/Skript/scripts/%script%.yml" parsed as number
+	set {team.conf::lengthmax} to value "team.length.max" get of "plugins/Skript/scripts/%script%.yml" parsed as number
+	set {team.conf::pvpinteam} to value "team.pvpinteam" get of "plugins/Skript/scripts/%script%.yml" parsed as boolean
+	set {team.conf::typecreate} to value "team.create" get of "plugins/Skript/scripts/%script%.yml"
+	if {team.conf::typecreate} is "item":
+		set {_paycreateitem::*} to value list "price.item-create" get of "plugins/Skript/scripts/%script%.yml"
+		clear {team.paycreateitem::*}
+		loop {_paycreateitem::*}:
+			add loop-value parsed as item to {team.paycreateitem::*}
+	if {team.conf::typecreate} is "money":
+		set {team.paycreatemoney} to value "price.money-create" get of "plugins/Skript/scripts/%script%.yml" parsed as number
+	if {team.conf::typecreate} is "none":
+		delete {team.conf::typecreate}
+
+command /team [<text=help>] [<text>] [<text>]:
+	aliases: sojusz
+	trigger:
+		if arg 1 is "help" or "pomoc" or "h":
+			if player doesn't have permission "team.use.help":
+				send "%{team.message::permission}%"
+				stop
+			set {_strona} to arg 2 parsed as number
+			if {_strona} is not set:
+				set {_strona} to 1
+			set {_liczbawpisow} to size of {team.help::*}
+			set {_liczba-stron} to ceil({_liczbawpisow}/10)
+			if {_liczba-stron} is smaller than 1:
+				set {_liczba-stron} to 1
+			if {_strona} is smaller than 1:
+				send "%{team.message::nopage}%"
+				stop
+			if {_strona} is greater than {_liczba-stron}:
+				send "%{team.message::nopage}%"
+				stop
+			if size of {team.help::*} is smaller than 1:
+				send "%{team.message::emptylist}%"
+				stop
+			loop {team.help::*}:
+				add loop-value to {_team.help::*}
+			send "&6&LPomoc &3Strona: &2%{_strona}%&6/&2%{_liczba-stron}%"
+			loop {_liczbawpisow} times:
+				set {_lista} to ({_strona}-1)*10
+				add loop-number to {_lista}
+				if {_team.help::%{_lista}%} is not set:
+					stop
+				if loop-number is 11:
+					stop
+				set {_wpis} to {_team.help::%{_lista}%}
+				replace "<command>" in {_wpis} with "%{last.command.%UUID of player%}%"
+				replace "<number>" in {_wpis} with "%{_lista}%"
+				send "%{_wpis}%"
+		if arg 1 is "create" or "stworz" or "c":
+			if player doesn't have permission "team.use.create":
+				send "%{team.message::permission}%"
+				stop
+			if arg 2 is not set:
+				send "Podaj naze teamu"
+				stop
+			set {_team} to arg 2
+			set {_uuid} to {uuid.%name of player%}
+			if {teamplayer::%{_uuid}%} is set:
+				send "Posiadasz juz team %{teamplayer::%{_uuid}%}%"
+				stop
+			if {team.%{_team}%::*} is set:
+				send "Team o tej nazwie juz istnieje"
+				stop
+			if length of {_team} is smaller than {team.conf::lengthmin}: 
+				send "Zbyt krotka nazwa teamu"
+				stop
+			if length of {_team} is greater than {team.conf::lengthmax}:
+				send "Zbyt dluga nazwa teamu"
+				stop
+			set {_typepay} to {team.conf::typecreate}
+			if {_typepay} is "item":
+				loop {team.paycreateitem::*}:
+					if player doesn't have loop-value:
+						add loop-value to {_brakujace::*}
+				if size of {_brakujace::*} is greater than 0:
+					send "Brakuje ci %{_brakujace::*}%"
+					stop
+				loop {team.paycreateitem::*}:
+					remove loop-value from player
+			if {_typepay} is "money":
+				if player's balance is smaller than {team.paycreatemoney}:
+					send "Masz za malo kasy. Brakuje ci %(player's balance-{team.paycreatemoney})%"
+					stop
+				remove {team.paycreatemoney} from the player's balance
+			add {_uuid} to {team.%{_team}%::*}
+			set {teamplayer::%{_uuid}%} to {_team}
+			add {_uuid} to {teamlider.%{_team}%::*}
+			add {_team} to {teams::*}
+			set {team.datacreate::%{_team}%} to now
+			send "Utworzon team %{_team}%"
+			stop
+		if arg 1 is "usun":
+			if player doesn't have permission "team.use.delete":
+				send "%{team.message::permission}%"
+				stop
+			set {_uuid} to {uuid.%name of player%}
+			if {teamplayer::%{_uuid}%} is not set:
+				send "Nie masz teamu"
+				stop
+			set {_team} to {teamplayer::%{_uuid}%}
+			loop {teamlider.%{_team}%::*}:
+				if loop-value is {_uuid}:
+					loop {team.%{_team}%::*}:
+						delete {teamplayer::%loop-value-2%}
+					delete {team.%{_team}%::*}
+					delete {teamplayer::%{_uuid}%}
+					delete {teamlider.%{_team}%::*}
+					delete {team.datacreate::%{_team}%}
+					remove {_team} from {teams::*}
+
+					send "Usunieto team %{_team}%"
+					stop
+			send "Nie jestes liderem"
+			stop
+		if arg 1 is "lista":
+			if player doesn't have permission "team.use.lista":
+				send "%{team.message::permission}%"
+				stop
+			set {_teams} to "%{teams::*}%"
+			replace " and" in {_teams} with ","
+			send "%{_teams}%"
+			stop
+		if arg 1 is "zapros" or "invite":
+			if player doesn't have permission "team.use.zapros":
+				send "%{team.message::permission}%"
+				stop
+			set {_uuid} to {uuid.%name of player%}
+			if {teamplayer::%{_uuid}%} is not set:
+				send "Nie masz teamu"
+				stop
+			if arg 2 is not set:
+				send "Podaj nazwe gracza"
+				stop
+			set {_team} to {teamplayer::%{_uuid}%}
+			if arg 2 parsed as player is not set:
+				send "Nie znaleziono takiego gracza"
+				stop
+			set {_gracz} to arg 2 parsed as player
+			set {_player} to {uuid.%name of arg 2 parsed as player%}
+			if {teamplayer::%{_player}%} is set:
+				send "Ten gracz ma juz team %{teamplayer::%{_player}%}%"
+				stop
+			loop {teamlider.%{_team}%::*}:
+				if loop-value is {_uuid}:
+					add {_player} to {team.%{_team}%.invited::*}
+					send "Zaprosiles %{player.%{_player}%}% to teamu %{_team}%"
+					send "Zostales zaproszony do teamu %{_team}%" to {_gracz}
+					stop
+			send "Nie jestes liderem"
+			stop
+		if arg 1 is "akceptuj" or "accept":
+			if player doesn't have permission "team.use.akceptuj":
+				send "%{team.message::permission}%"
+				stop
+			set {_uuid} to {uuid.%name of player%}
+			if arg 2 is not set:
+				send "Podaj nazwe temau"
+				stop
+			if {teamplayer::%{_uuid}%} is set:
+				send "Posiadasz juz team"
+				stop
+			set {_team} to arg 2
+			if {team.%{_team}%::*} is not set:
+				send "Nie znaleziono teamu o tej nazwie"
+				stop
+			loop {team.%{_team}%.invited::*}:
+				if loop-value is {_uuid}:
+					add {_uuid} to {team.%{_team}%::*}
+					set {teamplayer::%{_uuid}%} to {_team}
+					remove {_uuid} from {team.%{_team}%.invited::*}
+					send "Dolczyles do teamu %{_team}%"
+					loop {teamlider.%{_team}%::*}:
+						send "Gracz %name of player% dolaczyl do temu" to {player.%loop-value-2%} parsed as player
+					stop
+			send "Nie masz zaproszenia do tego teamu"
+			stop
+		if arg 1 is "info" or "i":
+			if player doesn't have permission "team.use.info":
+				send "%{team.message::permission}%"
+				stop
+			set {_uuid} to {uuid.%name of player%}
+			if arg 2 is not set:
+				if {teamplayer::%{_uuid}%} is not set:
+					send "Nie masz teamu"
+					stop
+				set {_team} to {teamplayer::%{_uuid}%}
+			if arg 2 is set:
+				set {_team} to arg 2
+				if {team.%{_team}%::*} is not set:
+					send "Nie znaleziono teamu o tej nazwie"
+					stop
+			send "Informacje team: %{_team}%"
+			loop {team.%{_team}%::*}:
+				send "%loop-index% - %{player.%loop-value%}%"
+			stop
+		if arg 1 is "test":
+			set {_uuid} to {uuid.%name of player%}
+			set {_team} to {teamplayer::%{_uuid}%}		
+			send "%{_team}%"
+		if arg 1 is "reload" or "r":
+			if executor is console:
+				execute console command "/sk reload %script%"
+				send "&cPrzeladowano" to console
+				stop
+			if player doesn't have permission "team.admin.reload":
+				send "%{team.message::permission}%"
+				stop
+			execute player command "/sk reload %script%"
+			send "&cPrzeladowano"
+			stop
+
+command /uuid:
+	trigger:
+		send "%{player.%UUID of player%}%"
+		send "%{uuid.%name of player%}%"
+on command:
+	set {last.command.%UUID of player%} to command
+
+on join:
+	if {player.%UUID of player%} is not set:
+		set {player.%UUID of player%} to name of player
+	if {uuid.%name of player%} is not set:
+		set {uuid.%name of player%} to UUID of player
+	if {player.%UUID of player%} is not name of player:
+		set {player.%UUID of player%} to name of player
+	if {uuid.%name of player%} is not UUID of player:
+		send "Kupa kupa kupa"
+
+on death:
+	victim is a player
+	set {_uuid} to {uuid.%name of victim%} 
+	{teamplayer::%{_uuid}%} is set
+	if {team.deaths::%{teamplayer::%{_uuid}%}%} is not set:
+		set {team.deaths::%{teamplayer::%{_uuid}%}%} to 0
+	add 1 to {team.deaths::%{teamplayer::%{_uuid}%}%}
+
+on death:
+	attacker is a player
+	victim is a player
+	set {_uuid} to {uuid.%name of attacker%} 
+	{teamplayer::%{_uuid}%} is set
+	if {team.murder::%{teamplayer::%{_uuid}%}%} is not set:
+		set {team.murder::%{teamplayer::%{_uuid}%}%} to 0
+	add 1 to {team.murder::%{teamplayer::%{_uuid}%}%}
+
+on damage:
+	attacker is a player
+	victim is a player
+	{team.conf::pvpinteam} is false
+	set {_victim} to {uuid.%name of victim%}
+	set {_attacker} to {uuid.%name of attacker%}
+	if {teamplayer::%{_victim}%} is {teamplayer::%{_attacker}%}:
+		send "PvP w teamie jest wylaczone" to attacker
+		cancel event
